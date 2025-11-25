@@ -1,0 +1,8 @@
+[package]
+name = "serializeable"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+serializeable_derive = {path = "serializeable_derive"}

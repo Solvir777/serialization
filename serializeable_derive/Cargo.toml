@@ -1,0 +1,12 @@
+[package]
+name = "serializeable_derive"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+syn = "2.0.110"
+quote = "1.0.42"
+proc-macro2 = "1.0.103"
+
+[lib]
+proc-macro = true
