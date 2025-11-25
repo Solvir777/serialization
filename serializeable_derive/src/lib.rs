@@ -1,9 +1,8 @@
 use proc_macro::TokenStream;
-use std::env::var;
 use proc_macro2::{Ident};
 use quote::{format_ident, quote, ToTokens};
 use syn;
-use syn::{Data, DataEnum, DataStruct, Field, Fields, Index, Type, Variant};
+use syn::{Data, DataEnum, DataStruct, Fields, Index, Variant};
 
 #[proc_macro_derive(Serializeable)]
 pub fn derive_serializeable(input: TokenStream) -> TokenStream {
