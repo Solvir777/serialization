@@ -4,6 +4,7 @@ pub use serializeable_derive::Serializeable;
 mod primitive_serialize;
 mod array_serialize;
 mod vec_serialize;
+mod box_serialize;
 
 pub trait Serializeable {
     fn serialize_into<E: Extend<u8>>(&self, data: &mut E);

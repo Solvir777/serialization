@@ -17,7 +17,7 @@ pub fn derive_serializeable(input: TokenStream) -> TokenStream {
             Fields::Unit => {impl_for_unit_struct(name)}
         },
         Data::Enum(enum_data) => impl_for_enum(name, enum_data),
-        Data::Union(_) => {todo!()}
+        Data::Union(_) => {unimplemented!()}
     };
     ge.into()
 }
@@ -103,35 +103,27 @@ fn impl_for_enum(name: &Ident, enum_data: DataEnum) -> TokenStream {
 }
 
 fn serialize_enum_variant(variant: &Variant, id: u8) -> proc_macro2::TokenStream {
-    let name = &variant.ident;
+    let variant_name = &variant.ident;
+    let fields_comma_sep = wrap_concat_fields(
+        &variant.fields,
+        |ident| quote!{#ident, }
+    );
+    let serialize_fields = wrap_concat_fields(
+        &variant.fields,
+        |ident| quote!{#ident.serialize_into(data);}
+    );
     match &variant.fields {
-        Fields::Named(named_fields) => {
-            let fields_comma_sep = wrap_concat_named_fields(
-                &named_fields,
-                |name| quote!{#name, }
-            );
-            let serialize_fields = wrap_concat_named_fields(
-                &named_fields,
-                |name| quote!{#name.serialize_into(data);}
-            );
+        Fields::Named(_) => {
             quote!{
-                Self::#name{#fields_comma_sep} => {
+                Self::#variant_name{#fields_comma_sep} => {
                     #id.serialize_into(data);
                     #serialize_fields
                 },
             }
         }
-        Fields::Unnamed(unnamed_fields) => {
-            let fields_comma_sep = wrap_concat_unnamed_fields(
-                &unnamed_fields,
-                |x| quote!{#x, }
-            );
-            let serialize_fields = wrap_concat_unnamed_fields(
-                &unnamed_fields,
-                |x| quote!{#x.serialize_into(data);}
-            );
+        Fields::Unnamed(_) => {
             quote!{
-                Self::#name(#fields_comma_sep) => {
+                Self::#variant_name(#fields_comma_sep) => {
                     #id.serialize_into(data);
                     #serialize_fields
                 },
@@ -139,7 +131,7 @@ fn serialize_enum_variant(variant: &Variant, id: u8) -> proc_macro2::TokenStream
         }
         Fields::Unit => {
             quote!{
-                Self::#name => {
+                Self::#variant_name => {
                     #id.serialize_into(data);
                 },
             }
@@ -149,19 +141,20 @@ fn serialize_enum_variant(variant: &Variant, id: u8) -> proc_macro2::TokenStream
 
 fn deserialize_enum_variant(variant: &Variant, id: u8) -> proc_macro2::TokenStream {
     let variant_name = &variant.ident;
-    match &variant.fields {
-        Fields::Named(named_fields) => {
-            let deserialize_fields = wrap_concat_named_fields(
-                named_fields,
+    let fields = &variant.fields;
+    match fields {
+        Fields::Named(_) => {
+            let deserialize_fields = wrap_concat_fields(
+                fields,
                 |name| quote!{#name: Serializeable::deserialize(reader),}
             );
             quote!{
                 #id => Self::#variant_name{#deserialize_fields},
             }
         }
-        Fields::Unnamed(unnamed_fields) => {
-            let deserialize_fields = wrap_concat_unnamed_fields(
-                unnamed_fields,
+        Fields::Unnamed(_) => {
+            let deserialize_fields = wrap_concat_fields(
+                fields,
                 |_| quote!{Serializeable::deserialize(reader), }
             );
             quote!{
@@ -176,25 +169,21 @@ fn deserialize_enum_variant(variant: &Variant, id: u8) -> proc_macro2::TokenStre
     }.into()
 }
 
-fn wrap_concat_named_fields(fields: &syn::FieldsNamed, wrap: fn(proc_macro2::TokenStream) -> proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    fields.named
-        .iter()
-        .map(
-            |field|
-                {
-                    let ident = &field.ident;
-                    wrap(quote!{#ident})
-                }
-        )
-        .fold(
-            quote!{}, |a, b| quote! {#a #b}
-        )
-}
 
-fn wrap_concat_unnamed_fields(fields: &syn::FieldsUnnamed, wrap: fn(proc_macro2::TokenStream) -> proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    (0..fields.unnamed.len())
-        .map(|index| wrap(format_ident!("field{}", index).into_token_stream()))
-        .fold(
-            quote!{}, |a, b| quote! {#a #b}
-        )
+fn wrap_concat_fields(fields: &Fields, wrap: fn(&proc_macro2::TokenStream) -> proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let names = if let Fields::Named(named_fields) = fields {
+        named_fields.named.iter().map(|field| {
+            let ident = &field.ident;
+            quote!{#ident}
+        }).collect::<Vec<_>>()
+    }
+    else{
+        (0..fields.len())
+            .map(
+                |index| format_ident!("field{}", index).into_token_stream()
+            ).collect::<Vec<_>>()
+    };
+    names.iter().map(
+        |ident| wrap(ident)
+    ).fold(quote!{}, |a, b| quote! {#a #b})
 }

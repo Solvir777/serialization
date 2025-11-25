@@ -2,7 +2,7 @@ use std::io::Read;
 use serializeable::Serializeable;
 
 fn main() {
-    let data = TestEnum::C(true, 200);
+    let data = TestEnum::C(Box::new(TestEnum::B{a: 18}));
     let a = data.serialize();
     println!("serialization finished: {:?}", a);
     let res = <TestEnum>::deserialize(&mut &a[..]);
@@ -24,7 +24,7 @@ fn main() {
 enum TestEnum{
     A,
     B{a: i32},
-    C(bool, u32)
+    C(Box<TestEnum>)
 }
 
 #[derive(Serializeable, Debug)]
