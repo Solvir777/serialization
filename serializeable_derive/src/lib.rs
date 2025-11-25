@@ -4,6 +4,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn;
 use syn::{Data, DataEnum, DataStruct, Fields, Index, Variant};
 
+
 #[proc_macro_derive(Serializeable)]
 pub fn derive_serializeable(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
@@ -52,7 +53,7 @@ fn impl_for_tuple_struct(name: &Ident, struct_data: DataStruct) -> TokenStream {
                     self.#idents.serialize_into(data);
                 ) *
             }
-            fn deserialize<R: Read>(reader: &mut R) -> Self {
+            fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Self {
                 Self(
                     #(
                         #tuple_contents
@@ -67,7 +68,7 @@ fn impl_for_unit_struct(name: &Ident) -> TokenStream {
     quote!{
         impl Serializeable for #name {
             fn serialize_into<E: Extend<u8>>(&self, data: &mut E) {}
-            fn deserialize<R: Read>(reader: &mut R) -> Self {}
+            fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Self {}
         }
     }.into()
 }
@@ -90,7 +91,7 @@ fn impl_for_enum(name: &Ident, enum_data: DataEnum) -> TokenStream {
                     #(#per_variant_serialize)*
                 }
             }
-            fn deserialize<R: Read>(reader: &mut R) -> Self {
+            fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Self {
                 let discr = u8::deserialize(reader);
                 match discr {
                     #(#per_variant_deserialize)*

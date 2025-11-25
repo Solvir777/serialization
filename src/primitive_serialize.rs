@@ -1,4 +1,4 @@
-use crate::Read;
+use std::io::Read;
 use crate::Serializeable;
 
 macro_rules! primitive_derive {
