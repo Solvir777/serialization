@@ -1,5 +1,4 @@
-use std::array;
-use std::io::Read;
+use std::io::Error;
 use crate::Serializeable;
 
 impl <T, const N: usize> Serializeable for [T; N]
@@ -12,7 +11,18 @@ where
         }
     }
 
-    fn deserialize<R: Read>(reader: &mut R) -> Self {
-        array::from_fn(|_| T::deserialize(reader))
+    fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Result<Self, std::io::Error> {
+        let items: Result<Vec<T>, Error> = (0..N)
+            .map(|_| T::deserialize(reader))
+            .collect();
+        Ok(items?.try_into().unwrap_or_else(|_| panic!("This shouldn't be able to fail")))
+    }
+    #[cfg(feature = "async")]
+    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Self {
+        let mut r = vec!();
+        for _ in 0..N {
+            r.push(T::async_deserialize(reader).await);
+        }
+        r.try_into().unwrap_or_else(|_| panic!("This shouldn't be able to fail"))
     }
 }
