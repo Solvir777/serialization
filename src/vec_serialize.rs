@@ -17,12 +17,14 @@ where
     }
 
     #[cfg(feature = "async")]
-    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Self {
-        let len = u64::async_deserialize(reader).await;
-        let mut r = vec!();
-        for _ in 0..len {
-            r.push(T::async_deserialize(reader).await);
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>> {
+        async {
+            let len = u64::async_deserialize(reader).await?;
+            let mut v = Vec::with_capacity(len as usize);
+            for _ in 0..len {
+                v.push(T::async_deserialize(reader).await?);
+            }
+            Ok(v)
         }
-        r
     }
 }

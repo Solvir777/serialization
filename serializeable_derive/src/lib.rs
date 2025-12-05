@@ -37,11 +37,13 @@ fn impl_for_struct(name: &Ident, fields: Fields) -> proc_macro2::TokenStream {
     {
         let async_deserialize = async_deserialize_struct_per_field(fields, &identifier);
         async_impl = Some(quote! {
-            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Self> {
+            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>> {
                 async {
-                    Self {
-                        #(#async_deserialize)*
-                    }
+                    Ok(
+                        Self {
+                            #(#async_deserialize)*
+                        }
+                    )
                 }
             }
         });
@@ -51,7 +53,7 @@ fn impl_for_struct(name: &Ident, fields: Fields) -> proc_macro2::TokenStream {
             fn serialize_into<E: Extend<u8>>(&self, data: &mut E) {
                 #(self.#identifier.serialize_into(data); )*
             }
-            fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
+            fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Result<Self, ::std::io::Error> {
             Ok(
                 Self{
                         #(#identifier: Serializeable::deserialize(reader)?,)*
@@ -63,15 +65,6 @@ fn impl_for_struct(name: &Ident, fields: Fields) -> proc_macro2::TokenStream {
     }
 }
 
-#[cfg(feature = "async")]
-fn async_deserialize_struct_per_field(fields: Fields, identifiers: &Vec<proc_macro2::TokenStream>) -> Vec<proc_macro2::TokenStream> {
-    fields.iter().zip(identifiers.iter()).map(|(field, identifier)| {
-        let ty = &field.ty.to_token_stream();
-        quote!{
-            #identifier: <#ty>::async_deserialize(reader).await,
-        }
-    }).collect::<Vec<_>>()
-}
 
 
 fn wrap_concat_fields(fields: &Fields, wrap: fn(&proc_macro2::TokenStream) -> proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -109,11 +102,11 @@ fn impl_for_enum(name: &Ident, enum_data: DataEnum) -> proc_macro2::TokenStream 
             deserialize_async_enum_variant(variant, variant_index as u8)
         }).collect::<Vec<_>>();
         async_impl = Some(quote! {
-            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Self> {
+            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error/*a*/ > > {
                 async {
-                    match u8::async_deserialize(reader).await {
+                    match u8::async_deserialize(reader).await? {
                         #(#per_variant_deserialize_async)*
-                        _ => panic!("Deserialization of enum failed: Invalid Discriminant")
+                        _ => Err(::std::io::Error::new(::std::io::ErrorKind::InvalidData, "invalid discriminant for enum")),
                     }
                 }
             }
@@ -227,7 +220,7 @@ fn deserialize_async_enum_variant(variant: &Variant, id: u8) -> proc_macro2::Tok
     let per_field_deserialize = variant.fields.iter().zip(identifiers.iter()).map(|(field, identifier)| {
         let ty = &field.ty.to_token_stream();
         quote!{
-            #identifier <#ty>::async_deserialize(reader).await,
+            #identifier <#ty>::async_deserialize(reader).await?,
         }
     }).collect::<Vec<_>>();
 
@@ -236,24 +229,34 @@ fn deserialize_async_enum_variant(variant: &Variant, id: u8) -> proc_macro2::Tok
     match fields {
         Fields::Named(_) => {
             quote!{
-                #id => Self::#variant_name
+                #id => Ok(Self::#variant_name
                 {
                     #(#per_field_deserialize)*
-                },
+                }),
             }
         }
         Fields::Unnamed(_) => {
             quote!{
-                #id => Self::#variant_name
+                #id => Ok(Self::#variant_name
                 (
                     #(#per_field_deserialize)*
-                ),
+                )),
             }
         }
         Fields::Unit => {
             quote!{
-                #id => Self::#variant_name,
+                #id => Ok(Self::#variant_name),
             }
         }
     }.into()
+}
+
+#[cfg(feature = "async")]
+fn async_deserialize_struct_per_field(fields: Fields, identifiers: &Vec<proc_macro2::TokenStream>) -> Vec<proc_macro2::TokenStream> {
+    fields.iter().zip(identifiers.iter()).map(|(field, identifier)| {
+        let ty = &field.ty.to_token_stream();
+        quote!{
+            #identifier: <#ty>::async_deserialize(reader).await?,
+        }
+    }).collect::<Vec<_>>()
 }

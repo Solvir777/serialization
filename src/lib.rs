@@ -15,8 +15,9 @@ pub trait Serializeable: Sized {
     /// Should only be called when you are sure the underlying data is of the specified type (use an enum to enable multiple possible types)
     fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Result<Self, std::io::Error>;
 
+    /// deserialize a struct from an AsyncRead source. Useful if you want to deserialize from a tokio::TcpStream
     #[cfg(feature = "async")]
-    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output = Self>;
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>>;
     /// Converts the Data into a vector of the raw bytes.
     fn serialize(&self) -> Vec<u8> {
         let mut vec = vec!();
@@ -36,3 +37,20 @@ pub trait Serializeable: Sized {
         Self::deserialize(&mut file)
     }
 }
+
+
+#[derive(Serializeable)]
+enum Test{
+    A(Vec<u8>),
+    B{a: Vec<u8>, b: Vec<u8>},
+    C,
+}
+
+#[derive(Serializeable)]
+struct Test2 {
+    test: i32,
+    str: String,
+}
+
+#[derive(Serializeable)]
+struct Test3 (String, String);

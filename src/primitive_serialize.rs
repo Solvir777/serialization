@@ -16,11 +16,11 @@ macro_rules! primitive_derive {
                 Ok(Self::from_be_bytes(buf))
             }
             #[cfg(feature = "async")]
-            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output = Self> {
+            fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output = Result<Self, ::std::io::Error>> {
                 async {
                     let mut buf = [0u8; size_of::<Self>()];
-                    reader.read_exact(&mut buf).await.unwrap();
-                    Self::from_be_bytes(buf)
+                    reader.read_exact(&mut buf).await?;
+                    Ok(Self::from_be_bytes(buf))
                 }
             }
         }
@@ -44,9 +44,11 @@ impl Serializeable for bool {
         Ok(buf[0] != 0)
     }
     #[cfg(feature = "async")]
-    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(r: &mut R) -> Self {
-        let mut b = [0];
-        r.read_exact(&mut b).await.unwrap();
-        b[0] != 0
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>> {
+        async {
+            let mut b = [0];
+            reader.read_exact(&mut b).await?;
+            Ok(b[0] != 0)
+        }
     }
 }

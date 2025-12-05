@@ -9,7 +9,9 @@ impl<T: Serializeable> Serializeable for Box<T> {
         Ok(Box::new(T::deserialize(reader)?))
     }
     #[cfg(feature = "async")]
-    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Self {
-        Box::new(T::async_deserialize(reader).await)
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>> {
+        async {
+            Ok(Box::new(T::async_deserialize(reader).await?))
+        }
     }
 }

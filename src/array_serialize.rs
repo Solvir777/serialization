@@ -18,11 +18,13 @@ where
         Ok(items?.try_into().unwrap_or_else(|_| panic!("This shouldn't be able to fail")))
     }
     #[cfg(feature = "async")]
-    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Self {
-        let mut r = vec!();
-        for _ in 0..N {
-            r.push(T::async_deserialize(reader).await);
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output=Result<Self, ::std::io::Error>> {
+        async {
+            let mut r = vec!();
+            for _ in 0..N {
+                r.push(T::async_deserialize(reader).await?);
+            }
+            Ok(r.try_into().unwrap_or_else(|_| panic!("This shouldn't be able to fail")))
         }
-        r.try_into().unwrap_or_else(|_| panic!("This shouldn't be able to fail"))
     }
 }

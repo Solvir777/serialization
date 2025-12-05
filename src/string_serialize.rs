@@ -7,14 +7,14 @@ impl Serializeable for String {
 
     fn deserialize<R: ::std::io::Read>(reader: &mut R) -> Result<Self, std::io::Error> {
         let vec = <Vec<u8>>::deserialize(reader)?;
-        match String::from_utf8(vec) {
-            Ok(string) => Ok(string),
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)),
-        }
+        String::from_utf8(vec).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
     #[cfg(feature = "async")]
-    async fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Self {
-        let vec = <Vec<u8>>::async_deserialize(reader).await;
-        String::from_utf8(vec).unwrap()
+    fn async_deserialize<R: ::tokio::io::AsyncRead + Unpin>(reader: &mut R) -> impl Future<Output = Result<Self, ::std::io::Error>> {
+        async {
+            let vec = <Vec<u8>>::async_deserialize(reader).await?;
+            String::from_utf8(vec)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        }
     }
 }
