@@ -1,11 +1,16 @@
-pub use serializeable_derive::Serializeable;
+#![feature(generic_const_exprs)]
 
+
+pub use serializeable_derive::Serializeable;
 
 mod primitive_serialize;
 mod array_serialize;
 mod vec_serialize;
 mod box_serialize;
 mod string_serialize;
+
+#[cfg(feature = "nalgebra")]
+mod nalgebra_arrays;
 
 pub trait Serializeable: Sized {
 
